@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ortak — AI Dashboard</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/globe.gl@2.45.0/dist/globe.gl.min.js"></script>
+<script src="https://unpkg.com/topojson-client@3"></script>
 <script>
 tailwind.config = {
   theme: {
@@ -34,6 +36,28 @@ tailwind.config = {
   .font-mono { font-family: 'Inter', system-ui, sans-serif !important; font-variant-numeric: tabular-nums; }
   @keyframes ping { 75%,100% { transform: scale(2); opacity: 0; } }
   .animate-ping { animation: ping 1.5s cubic-bezier(0,0,0.2,1) infinite; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fadeIn { animation: fadeIn 0.3s ease both; }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes globePulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.3); }
+    50% { box-shadow: 0 0 0 6px rgba(139, 92, 246, 0); }
+  }
+  .globe-btn-pulse { animation: globePulse 2s ease-in-out infinite; }
+  
+  #globeView { transition: opacity 0.5s ease; }
+  #globeView.globe-hidden { opacity: 0; pointer-events: none; }
+  #globeView.globe-visible { opacity: 1; pointer-events: auto; }
+  .globe-metrics-enter { animation: fadeInUp 0.6s ease 0.3s both; }
+  .globe-topbar-enter { animation: fadeInUp 0.4s ease 0.1s both; }
+  #globeContainer canvas { cursor: grab; }
+  #globeContainer canvas:active { cursor: grabbing; }
 </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen antialiased">
@@ -61,39 +85,36 @@ tailwind.config = {
 <div class="max-w-7xl mx-auto p-6 space-y-6">
 
   <!-- ═══ TOP BAR ═══ -->
-  <div class="rounded-xl border border-slate-200 bg-white px-5 py-4 flex items-center justify-between shadow-card">
-    <div class="flex items-center gap-6">
-      <div class="flex items-center gap-3">
-        <svg class="w-10 h-10 rounded-full shadow-sm" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="20" r="20" fill="white"/><path d="M22.2485 20.6347L21.2563 20.864C19.1115 21.3591 17.4368 23.0329 16.9409 25.1761L16.2039 28.3634C16.1661 28.5263 15.9341 28.5263 15.8963 28.3634L15.1593 25.1761C14.6639 23.0325 12.9887 21.3591 10.8439 20.864L9.85293 20.6352C9.85293 20.6352 8.3453 20.3959 6.66809 20.403C6.88216 27.5797 12.7676 33.3326 20.0014 33.3326C27.2353 33.3326 33.1182 27.5818 33.3348 20.4071H24.9358C23.483 20.4404 22.273 20.6306 22.2485 20.6347Z" fill="url(#paint0_linear_10680_2409)"/><path d="M15.1588 14.7718L15.8957 11.5841C15.9336 11.4213 16.1655 11.4213 16.2033 11.5841L16.9403 14.7718C17.4358 16.915 19.1109 18.5884 21.2558 19.0839L21.2674 19.0864C21.3884 19.1118 22.4217 19.319 25.045 19.5051C25.8057 19.5591 31.1233 19.5296 33.333 19.5325C33.0865 12.3853 27.2139 6.66602 20.0013 6.66602C12.7886 6.66602 6.91694 12.3845 6.66962 19.5313C9.76342 19.3261 10.8433 19.0835 10.8433 19.0835C12.9882 18.5884 14.6633 16.9146 15.1588 14.7714V14.7718Z" fill="url(#paint1_linear_10680_2409)"/><defs><linearGradient id="paint0_linear_10680_2409" x1="10.8348" y1="22.4231" x2="17.9727" y2="37.1446" gradientUnits="userSpaceOnUse"><stop stop-color="#753EFF"/><stop offset="1" stop-color="#4E0B9F"/></linearGradient><linearGradient id="paint1_linear_10680_2409" x1="10.8358" y1="8.67726" x2="17.9226" y2="23.3572" gradientUnits="userSpaceOnUse"><stop stop-color="#753EFF"/><stop offset="1" stop-color="#4E0B9F"/></linearGradient></defs></svg>
-        <div>
-          <h1 class="text-base font-bold tracking-tight text-slate-900">Ortak</h1>
-          <p class="text-[10px] text-slate-400 tracking-wide">AI Conversation & Automation Intelligence</p>
-        </div>
-      </div>
-      <div class="w-px h-8 bg-slate-200"></div>
-      <div class="flex items-center gap-8">
-        <div class="text-center">
-          <p class="text-lg font-bold font-mono tracking-tight text-slate-900">142.8K</p>
-          <p class="text-[10px] uppercase tracking-widest text-slate-400">Conversations / Mo</p>
-        </div>
-        <div class="text-center">
-          <p class="text-lg font-bold font-mono tracking-tight text-slate-900">93.7%</p>
-          <p class="text-[10px] uppercase tracking-widest text-slate-400">Containment</p>
-        </div>
-        <div class="text-center">
-          <p class="text-lg font-bold font-mono tracking-tight text-slate-900">+₺2.4M</p>
-          <p class="text-[10px] uppercase tracking-widest text-slate-400">Commission Impact</p>
-        </div>
+  <div class="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-card grid grid-cols-[auto_1fr_auto] items-center gap-6">
+    <!-- Left: Logo -->
+    <div class="flex items-center gap-3">
+      <svg class="w-10 h-10 rounded-full shadow-sm" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="20" cy="20" r="20" fill="white"/><path d="M22.2485 20.6347L21.2563 20.864C19.1115 21.3591 17.4368 23.0329 16.9409 25.1761L16.2039 28.3634C16.1661 28.5263 15.9341 28.5263 15.8963 28.3634L15.1593 25.1761C14.6639 23.0325 12.9887 21.3591 10.8439 20.864L9.85293 20.6352C9.85293 20.6352 8.3453 20.3959 6.66809 20.403C6.88216 27.5797 12.7676 33.3326 20.0014 33.3326C27.2353 33.3326 33.1182 27.5818 33.3348 20.4071H24.9358C23.483 20.4404 22.273 20.6306 22.2485 20.6347Z" fill="url(#paint0_linear_10680_2409)"/><path d="M15.1588 14.7718L15.8957 11.5841C15.9336 11.4213 16.1655 11.4213 16.2033 11.5841L16.9403 14.7718C17.4358 16.915 19.1109 18.5884 21.2558 19.0839L21.2674 19.0864C21.3884 19.1118 22.4217 19.319 25.045 19.5051C25.8057 19.5591 31.1233 19.5296 33.333 19.5325C33.0865 12.3853 27.2139 6.66602 20.0013 6.66602C12.7886 6.66602 6.91694 12.3845 6.66962 19.5313C9.76342 19.3261 10.8433 19.0835 10.8433 19.0835C12.9882 18.5884 14.6633 16.9146 15.1588 14.7714V14.7718Z" fill="url(#paint1_linear_10680_2409)"/><defs><linearGradient id="paint0_linear_10680_2409" x1="10.8348" y1="22.4231" x2="17.9727" y2="37.1446" gradientUnits="userSpaceOnUse"><stop stop-color="#753EFF"/><stop offset="1" stop-color="#4E0B9F"/></linearGradient><linearGradient id="paint1_linear_10680_2409" x1="10.8358" y1="8.67726" x2="17.9226" y2="23.3572" gradientUnits="userSpaceOnUse"><stop stop-color="#753EFF"/><stop offset="1" stop-color="#4E0B9F"/></linearGradient></defs></svg>
+      <div>
+        <h1 class="text-base font-bold tracking-tight text-slate-900">Ortak</h1>
+        <p class="text-[10px] text-slate-400 tracking-wide">AI Conversation & Automation Intelligence</p>
       </div>
     </div>
-    <div class="flex items-center gap-5">
-      <div class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 px-3 py-1 text-xs font-semibold">
-        <span class="relative flex h-2 w-2">
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
-          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-        </span>
-        LIVE
+    <!-- Center: Metrics -->
+    <div class="flex items-center justify-center gap-8">
+      <div class="text-center">
+        <p class="text-lg font-bold font-mono tracking-tight text-slate-900">142.8K</p>
+        <p class="text-[10px] uppercase tracking-widest text-slate-400">Conversations / Mo</p>
       </div>
+      <div class="text-center">
+        <p class="text-lg font-bold font-mono tracking-tight text-slate-900">93.7%</p>
+        <p class="text-[10px] uppercase tracking-widest text-slate-400">Containment</p>
+      </div>
+      <div class="text-center">
+        <p class="text-lg font-bold font-mono tracking-tight text-slate-900">+₺2.4M</p>
+        <p class="text-[10px] uppercase tracking-widest text-slate-400">Commission Impact</p>
+      </div>
+    </div>
+    <!-- Right: Live View + Clock -->
+    <div class="flex items-center gap-3">
+      <button onclick="openGlobe()" class="inline-flex items-center gap-2 rounded-full border border-purple-200 bg-purple-50 text-purple-600 px-3.5 py-1.5 text-xs font-semibold hover:bg-purple-100 hover:border-purple-300 transition-all cursor-pointer globe-btn-pulse">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        Live View
+      </button>
       <div class="text-right">
         <p class="text-sm font-semibold font-mono text-slate-700" id="clock"></p>
         <p class="text-[10px] text-slate-400" id="date"></p>
@@ -105,7 +126,6 @@ tailwind.config = {
   <div>
     <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-3 pl-0.5">Usage & Activation</p>
     <div class="grid grid-cols-3 gap-4">
-
       <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-card hover:shadow-card-hover transition-shadow max-h-[140px] relative">
         <div class="flex items-start justify-between">
           <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Automation Opt-in</span>
@@ -114,7 +134,6 @@ tailwind.config = {
         <p class="text-3xl font-bold font-mono tracking-tight text-slate-900 mt-1.5">48.3%</p>
         <p class="text-[11px] text-slate-400 mt-0.5">Sellers who enabled automation</p>
       </div>
-
       <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-card hover:shadow-card-hover transition-shadow max-h-[140px] relative">
         <div class="flex items-start justify-between">
           <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">First Interaction Rate</span>
@@ -123,7 +142,6 @@ tailwind.config = {
         <p class="text-3xl font-bold font-mono tracking-tight text-slate-900 mt-1.5">71.8%</p>
         <p class="text-[11px] text-slate-400 mt-0.5">Action rate after drawer opened</p>
       </div>
-
       <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-card hover:shadow-card-hover transition-shadow max-h-[140px] relative">
         <div class="flex items-start justify-between">
           <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Repeat Action Rate</span>
@@ -139,7 +157,6 @@ tailwind.config = {
   <div>
     <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-3 pl-0.5">AI & Automation Metrics</p>
     <div class="grid grid-cols-3 gap-4">
-
       <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-card hover:shadow-card-hover transition-shadow max-h-[140px]">
         <div class="flex items-start justify-between">
           <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">AI Suggestion Adoption</span>
@@ -148,7 +165,6 @@ tailwind.config = {
         <p class="text-3xl font-bold font-mono tracking-tight text-slate-900 mt-1.5">62.4%</p>
         <p class="text-[11px] text-slate-400 mt-0.5">AI suggestions applied by sellers</p>
       </div>
-
       <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-card hover:shadow-card-hover transition-shadow max-h-[140px]">
         <div class="flex items-start justify-between">
           <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Override Rate</span>
@@ -157,7 +173,6 @@ tailwind.config = {
         <p class="text-3xl font-bold font-mono tracking-tight text-slate-900 mt-1.5">14.6%</p>
         <p class="text-[11px] text-slate-400 mt-0.5">Manual changes after suggestion applied</p>
       </div>
-
       <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-card hover:shadow-card-hover transition-shadow max-h-[140px]">
         <div class="flex items-start justify-between">
           <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Automation Activation</span>
@@ -166,7 +181,6 @@ tailwind.config = {
         <p class="text-3xl font-bold font-mono tracking-tight text-slate-900 mt-1.5">43.8%</p>
         <p class="text-[11px] text-slate-400 mt-0.5">Suggested automations activated</p>
       </div>
-
     </div>
   </div>
 
@@ -257,7 +271,6 @@ tailwind.config = {
 <!-- ═══ CHAT SIDEBAR ═══ -->
 <div id="chatOverlay" class="fixed inset-0 bg-black/15 backdrop-blur-[2px] z-40 opacity-0 pointer-events-none transition-opacity duration-300" onclick="closeChat()"></div>
 <div id="chatSidebar" class="fixed top-0 right-0 h-full w-[460px] bg-white border-l border-slate-200 shadow-2xl z-50 translate-x-full transition-transform duration-300 ease-out flex flex-col">
-  <!-- Header -->
   <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
     <div>
       <p class="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Live Conversation</p>
@@ -272,13 +285,10 @@ tailwind.config = {
       </button>
     </div>
   </div>
-  <!-- Topic -->
   <div class="px-5 py-2.5 bg-slate-50/60 border-b border-slate-100 shrink-0">
     <p class="text-xs text-slate-500"><span class="font-semibold text-slate-600">Topic:</span> <span id="chatTopic"></span></p>
   </div>
-  <!-- Messages -->
   <div id="chatMessages" class="flex-1 overflow-y-auto px-5 py-4 space-y-3"></div>
-  <!-- Typing Indicator -->
   <div id="typingIndicator" class="px-5 py-3 border-t border-slate-100 bg-slate-50/40 shrink-0 hidden">
     <div class="flex items-center gap-2.5">
       <div class="flex items-center gap-1">
@@ -291,12 +301,105 @@ tailwind.config = {
   </div>
 </div>
 
+</div><!-- end #dashboard -->
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- ═══ GLOBE LIVE VIEW (Full-Screen Overlay) ═══ -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="globeView" class="fixed inset-0 z-[80] globe-hidden" style="display:none; background: linear-gradient(180deg, #f8fafc 0%, #e8edf5 40%, #dde4f0 100%);">
+
+  <!-- Globe Container -->
+  <div id="globeContainer" class="absolute inset-0 overflow-hidden"></div>
+
+  <!-- Top Bar -->
+  <div class="absolute top-0 left-0 right-0 z-10 globe-topbar-enter">
+    <div class="flex items-center justify-between px-6 py-4">
+      <div class="flex items-center gap-4">
+        <button onclick="closeGlobe()" class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/80 backdrop-blur border border-slate-200 text-slate-600 text-sm font-medium hover:bg-white hover:border-slate-300 transition-all cursor-pointer shadow-card">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+          Dashboard
+        </button>
+        <div class="w-px h-8 bg-slate-200"></div>
+        <div>
+          <h2 class="text-lg font-bold text-slate-900 tracking-tight">Live View</h2>
+          <p class="text-[11px] text-slate-400" id="globeDate"></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 bg-white/80 backdrop-blur border border-slate-200 rounded-full px-4 py-2 shadow-card">
+          <span class="w-2 h-2 rounded-full bg-orange-500"></span>
+          <span class="text-[11px] text-slate-500 font-medium">Active Sellers</span>
+        </div>
+        <div class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 px-3 py-1.5 text-xs font-semibold shadow-card">
+          <span class="relative flex h-2 w-2">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          LIVE
+        </div>
+        <button onclick="toggleFullscreen()" class="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/80 backdrop-blur border border-slate-200 text-slate-500 text-xs font-medium hover:bg-white hover:border-slate-300 transition-all cursor-pointer shadow-card">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+          Full screen
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Metrics Overlay -->
+  <div class="absolute bottom-0 left-0 right-0 z-10 p-5 globe-metrics-enter" style="padding-left:140px; padding-right:140px;">
+    <div class="grid grid-cols-4 gap-3">
+
+      <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-card hover:shadow-card-hover transition-shadow">
+        <div class="flex items-start justify-between">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Active Sellers Now</span>
+          <span class="inline-flex items-center gap-1 rounded-md px-1.5 py-px text-[10px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100">↑ +4.7%</span>
+        </div>
+        <p class="text-3xl font-bold font-mono tracking-tight text-slate-900 mt-1.5">781</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">Currently online sellers</p>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-card hover:shadow-card-hover transition-shadow">
+        <div class="flex items-start justify-between">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">AI Conversations</span>
+          <span class="inline-flex items-center gap-1 rounded-md px-1.5 py-px text-[10px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100">↑ +12.3%</span>
+        </div>
+        <p class="text-3xl font-bold font-mono tracking-tight text-slate-900 mt-1.5">46,268</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">Total conversations today</p>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-card hover:shadow-card-hover transition-shadow">
+        <div class="flex items-start justify-between">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Total Commission</span>
+          <span class="inline-flex items-center gap-1 rounded-md px-1.5 py-px text-[10px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100">↑ +8.6%</span>
+        </div>
+        <p class="text-3xl font-bold font-mono tracking-tight text-slate-900 mt-1.5">₺148,229</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">Revenue from AI-assisted sales</p>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-card hover:shadow-card-hover transition-shadow">
+        <div class="flex items-start justify-between">
+          <span class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Automations</span>
+          <span class="inline-flex items-center gap-1 rounded-md px-1.5 py-px text-[10px] font-semibold bg-emerald-50 text-emerald-600 border border-emerald-100">↑ +15.1%</span>
+        </div>
+        <p class="text-3xl font-bold font-mono tracking-tight text-slate-900 mt-1.5">1,912</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">Automations triggered today</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <script>
   // ── Clock ──
   function tick() {
     const now = new Date();
     document.getElementById('clock').textContent = now.toLocaleTimeString('en-US', { hour12: false });
-    document.getElementById('date').textContent = now.toLocaleDateString('en-US', { day:'numeric', month:'long', year:'numeric', weekday:'short' });
+    const dd = String(now.getDate()).padStart(2,'0');
+    const mm = String(now.getMonth()+1).padStart(2,'0');
+    const yy = String(now.getFullYear()).slice(-2);
+    document.getElementById('date').textContent = dd + '/' + mm + '/' + yy;
+    const gd = document.getElementById('globeDate');
+    if (gd) gd.textContent = now.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) + ' at ' + now.toLocaleTimeString('en-US', { hour12: true, hour:'numeric', minute:'2-digit' });
   }
   tick();
   setInterval(tick, 1000);
@@ -351,7 +454,7 @@ tailwind.config = {
     }
   ];
 
-  // ── Open / Close Sidebar ──
+  // ── Open / Close Chat Sidebar ──
   let typingTimeout = null;
 
   function openChat(index) {
@@ -371,7 +474,6 @@ tailwind.config = {
     const container = document.getElementById('chatMessages');
     container.innerHTML = '';
 
-    // Render messages one by one with stagger
     conv.messages.forEach((msg, i) => {
       setTimeout(() => {
         const div = document.createElement('div');
@@ -381,7 +483,6 @@ tailwind.config = {
           ? 'max-w-[85%] px-4 py-2.5 rounded-2xl rounded-br-md bg-blue-600 text-white text-sm leading-relaxed'
           : 'max-w-[85%] px-4 py-2.5 rounded-2xl rounded-bl-md bg-slate-100 text-slate-700 text-sm leading-relaxed';
 
-        // Add sender label
         const label = document.createElement('p');
         label.className = msg.from === 'seller'
           ? 'text-[10px] font-semibold text-blue-200 mb-1'
@@ -398,7 +499,6 @@ tailwind.config = {
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
 
-        // Show typing after last message
         if (i === conv.messages.length - 1 && msg.from === 'seller') {
           typingTimeout = setTimeout(() => {
             document.getElementById('typingIndicator').classList.remove('hidden');
@@ -423,19 +523,184 @@ tailwind.config = {
     document.getElementById('chatSidebar').classList.remove('translate-x-0');
   }
 
-  // Close on Escape
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeChat(); });
-</script>
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeChat(); closeGlobe(); } });
 
-<style>
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
+  // ══════════════════════════════════════════
+  // ── GLOBE LIVE VIEW ──
+  // ══════════════════════════════════════════
+  let globeInstance = null;
+  let globeInitialized = false;
+
+  const sellerPoints = [
+    { lat: 41.01, lng: 28.97, size: 0.01, color: '#f97316', radius: 0.6 },
+    { lat: 41.03, lng: 29.05, size: 0.01, color: '#f97316', radius: 0.35 },
+    { lat: 40.98, lng: 28.85, size: 0.01, color: '#f97316', radius: 0.3 },
+    { lat: 41.08, lng: 29.01, size: 0.01, color: '#f97316', radius: 0.25 },
+    { lat: 40.95, lng: 29.10, size: 0.01, color: '#f97316', radius: 0.2 },
+    { lat: 39.92, lng: 32.85, size: 0.01, color: '#f97316', radius: 0.5 },
+    { lat: 39.88, lng: 32.80, size: 0.01, color: '#f97316', radius: 0.25 },
+    { lat: 38.42, lng: 27.13, size: 0.01, color: '#f97316', radius: 0.45 },
+    { lat: 38.45, lng: 27.20, size: 0.01, color: '#f97316', radius: 0.2 },
+    { lat: 36.89, lng: 30.69, size: 0.01, color: '#f97316', radius: 0.4 },
+    { lat: 40.18, lng: 29.06, size: 0.01, color: '#f97316', radius: 0.35 },
+    { lat: 37.00, lng: 35.32, size: 0.01, color: '#f97316', radius: 0.3 },
+    { lat: 37.06, lng: 37.38, size: 0.01, color: '#f97316', radius: 0.25 },
+    { lat: 37.87, lng: 32.48, size: 0.01, color: '#f97316', radius: 0.2 },
+    { lat: 40.65, lng: 29.29, size: 0.01, color: '#f97316', radius: 0.2 },
+    { lat: 38.73, lng: 35.48, size: 0.01, color: '#f97316', radius: 0.18 },
+    { lat: 39.77, lng: 30.52, size: 0.01, color: '#f97316', radius: 0.18 },
+    { lat: 41.27, lng: 36.33, size: 0.01, color: '#f97316', radius: 0.2 },
+    { lat: 37.75, lng: 30.28, size: 0.01, color: '#f97316', radius: 0.15 },
+    { lat: 40.73, lng: 30.40, size: 0.01, color: '#f97316', radius: 0.15 },
+    { lat: 36.80, lng: 34.63, size: 0.01, color: '#f97316', radius: 0.18 },
+    { lat: 39.64, lng: 27.88, size: 0.01, color: '#f97316', radius: 0.15 },
+    { lat: 41.18, lng: 41.00, size: 0.01, color: '#f97316', radius: 0.15 },
+    { lat: 38.35, lng: 38.31, size: 0.01, color: '#f97316', radius: 0.15 },
+    { lat: 51.51, lng: -0.13, size: 0.01, color: '#f97316', radius: 0.35 },
+    { lat: 52.52, lng: 13.40, size: 0.01, color: '#f97316', radius: 0.3 },
+    { lat: 48.86, lng: 2.35, size: 0.01, color: '#f97316', radius: 0.25 },
+    { lat: 40.42, lng: -3.70, size: 0.01, color: '#f97316', radius: 0.2 },
+    { lat: 41.90, lng: 12.50, size: 0.01, color: '#f97316', radius: 0.18 },
+    { lat: 52.37, lng: 4.89, size: 0.01, color: '#f97316', radius: 0.2 },
+    { lat: 25.20, lng: 55.27, size: 0.01, color: '#f97316', radius: 0.35 },
+    { lat: 24.71, lng: 46.67, size: 0.01, color: '#f97316', radius: 0.18 },
+    { lat: 33.89, lng: 35.50, size: 0.01, color: '#f97316', radius: 0.15 },
+    { lat: 40.71, lng: -74.01, size: 0.01, color: '#f97316', radius: 0.3 },
+    { lat: 34.05, lng: -118.24, size: 0.01, color: '#f97316', radius: 0.18 },
+    { lat: -23.55, lng: -46.63, size: 0.01, color: '#f97316', radius: 0.15 },
+    { lat: 35.68, lng: 139.69, size: 0.01, color: '#f97316', radius: 0.15 },
+    { lat: 1.35, lng: 103.82, size: 0.01, color: '#f97316', radius: 0.12 },
+  ];
+
+  const arcData = [
+    { startLat: 41.01, startLng: 28.97, endLat: 39.92, endLng: 32.85, color: ['rgba(249,115,22,0.3)', 'rgba(249,115,22,0.15)'] },
+    { startLat: 41.01, startLng: 28.97, endLat: 38.42, endLng: 27.13, color: ['rgba(249,115,22,0.25)', 'rgba(249,115,22,0.12)'] },
+    { startLat: 41.01, startLng: 28.97, endLat: 36.89, endLng: 30.69, color: ['rgba(249,115,22,0.25)', 'rgba(249,115,22,0.12)'] },
+    { startLat: 41.01, startLng: 28.97, endLat: 51.51, endLng: -0.13, color: ['rgba(249,115,22,0.18)', 'rgba(249,115,22,0.08)'] },
+    { startLat: 41.01, startLng: 28.97, endLat: 25.20, endLng: 55.27, color: ['rgba(249,115,22,0.18)', 'rgba(249,115,22,0.08)'] },
+    { startLat: 41.01, startLng: 28.97, endLat: 52.52, endLng: 13.40, color: ['rgba(249,115,22,0.15)', 'rgba(249,115,22,0.06)'] },
+    { startLat: 41.01, startLng: 28.97, endLat: 40.71, endLng: -74.01, color: ['rgba(249,115,22,0.12)', 'rgba(249,115,22,0.05)'] },
+  ];
+
+  const ringsData = [
+    { lat: 41.01, lng: 28.97, maxR: 3, propagationSpeed: 1.5, repeatPeriod: 1400, color: 'rgba(249,115,22,0.25)' },
+    { lat: 39.92, lng: 32.85, maxR: 2, propagationSpeed: 1.5, repeatPeriod: 1800, color: 'rgba(249,115,22,0.2)' },
+    { lat: 38.42, lng: 27.13, maxR: 2, propagationSpeed: 1, repeatPeriod: 2200, color: 'rgba(249,115,22,0.15)' },
+    { lat: 25.20, lng: 55.27, maxR: 1.5, propagationSpeed: 1, repeatPeriod: 2600, color: 'rgba(249,115,22,0.12)' },
+    { lat: 51.51, lng: -0.13, maxR: 1.5, propagationSpeed: 1, repeatPeriod: 3000, color: 'rgba(249,115,22,0.1)' },
+  ];
+
+  function createLightGlobeTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 4;
+    canvas.height = 4;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#dfe6ee';
+    ctx.fillRect(0, 0, 4, 4);
+    return canvas.toDataURL();
   }
-  .animate-fadeIn { animation: fadeIn 0.3s ease both; }
-</style>
 
-</div><!-- end #dashboard -->
+  function initGlobe() {
+    if (globeInitialized) return;
+    if (typeof Globe === 'undefined') { console.error('Globe.gl not loaded'); return; }
+
+    globeInitialized = true;
+    const container = document.getElementById('globeContainer');
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+
+    globeInstance = Globe()
+      .width(w)
+      .height(h)
+      .globeImageUrl(createLightGlobeTexture())
+      .backgroundColor('rgba(0,0,0,0)')
+      .atmosphereColor('rgba(99, 102, 241, 0.15)')
+      .atmosphereAltitude(0.18)
+      .showGraticules(false)
+      .pointsData(sellerPoints)
+      .pointAltitude('size')
+      .pointColor('color')
+      .pointRadius(d => d.radius || 0.2)
+      .pointsMerge(false)
+      .arcsData(arcData)
+      .arcColor('color')
+      .arcDashLength(0.6)
+      .arcDashGap(0.3)
+      .arcDashAnimateTime(2500)
+      .arcStroke(0.4)
+      .ringsData(ringsData)
+      .ringColor('color')
+      .ringMaxRadius('maxR')
+      .ringPropagationSpeed('propagationSpeed')
+      .ringRepeatPeriod('repeatPeriod')
+      .onGlobeReady(() => {
+        globeInstance.pointOfView({ lat: 33, lng: 38, altitude: 1.4 }, 1500);
+        loadCountryPolygons();
+      })
+      (container);
+
+    globeInstance.controls().autoRotate = false;
+    globeInstance.controls().enableZoom = true;
+    globeInstance.controls().minDistance = 120;
+    globeInstance.controls().maxDistance = 400;
+
+    window.addEventListener('resize', handleGlobeResize);
+  }
+
+  function loadCountryPolygons() {
+    fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
+      .then(r => r.json())
+      .then(worldData => {
+        if (typeof topojson === 'undefined') return;
+        const countries = topojson.feature(worldData, worldData.objects.countries);
+        globeInstance
+          .hexPolygonsData(countries.features)
+          .hexPolygonResolution(3)
+          .hexPolygonMargin(0.35)
+          .hexPolygonUseDots(false)
+          .hexPolygonColor(() => '#b0bec9')
+          .hexPolygonAltitude(0.004);
+      })
+      .catch(() => {});
+  }
+
+  function handleGlobeResize() {
+    if (!globeInstance) return;
+    globeInstance.width(window.innerWidth);
+    globeInstance.height(window.innerHeight);
+  }
+
+  function openGlobe() {
+    const view = document.getElementById('globeView');
+    view.style.display = 'block';
+    requestAnimationFrame(() => {
+      view.classList.remove('globe-hidden');
+      view.classList.add('globe-visible');
+    });
+    document.body.style.overflow = 'hidden';
+
+    if (!globeInitialized) {
+      setTimeout(initGlobe, 200);
+    } else {
+      handleGlobeResize();
+    }
+  }
+
+  function closeGlobe() {
+    const view = document.getElementById('globeView');
+    view.classList.add('globe-hidden');
+    view.classList.remove('globe-visible');
+    document.body.style.overflow = '';
+  }
+
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  }
+</script>
 
 <script>
   function checkPwd() {
